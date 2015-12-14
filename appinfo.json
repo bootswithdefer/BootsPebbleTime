@@ -1,0 +1,24 @@
+{
+    "appKeys": {},
+    "capabilities": [
+        ""
+    ],
+    "companyName": "Jesse DeFer",
+    "longName": "boots-time",
+    "projectType": "native",
+    "resources": {
+        "media": []
+    },
+    "sdkVersion": "3",
+    "shortName": "boots-time",
+    "targetPlatforms": [
+        "aplite",
+        "basalt",
+        "chalk"
+    ],
+    "uuid": "4b7e4a99-b5a5-461b-b14a-2bfe823b198a",
+    "versionLabel": "1.0",
+    "watchapp": {
+        "watchface": true
+    }
+}
