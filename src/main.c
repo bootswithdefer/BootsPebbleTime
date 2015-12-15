@@ -3,40 +3,58 @@
 
 static Window *s_main_window;
 static TextLayer *s_time_layer;
+static TextLayer *s_date_layer;
 static TextLayer *s_unixtime_layer;
+static TextLayer *s_battery_layer;
 
 static void update_time() {
   // Get a tm structure
   time_t temp = time(NULL); 
   struct tm *tick_time = localtime(&temp);
 
-  // Write the current hours and minutes into a buffer
+  // *** time ***
   static char s_buffer[8];
-  strftime(s_buffer, sizeof(s_buffer), clock_is_24h_style() ?
-                                          "%H:%M" : "%I:%M", tick_time);
-
-  // Display this time on the TextLayer
+  strftime(s_buffer, sizeof(s_buffer), clock_is_24h_style() ? "%H:%M" : "%I:%M", tick_time);
+  
   text_layer_set_text(s_time_layer, s_buffer);
 
-  static char buf[14];
-  snprintf(buf, sizeof(buf), "%lu", temp);
+  // *** date ***
+  static char s_datebuf[12];
+  strftime(s_datebuf, sizeof(s_datebuf), "%F", tick_time); 
+  
+  text_layer_set_text(s_date_layer, s_datebuf);
+  
+  // *** unix time ***
+  char s_unixbuf[14];
+  snprintf(s_unixbuf, sizeof(s_unixbuf), "%lu", temp);
 
   int c, i;
-  static char out[14];
+  static char s_unixbuf_f[14];
   char *p;
 
-  c = 2 - strlen(buf) % 3;
+  c = 2 - strlen(s_unixbuf) % 3;
   i = 0;
-  for (p = buf; *p != 0; p++) {
-     out[i++] = *p;
+  for (p = s_unixbuf; *p != 0; p++) {
+     s_unixbuf_f[i++] = *p;
      if (c == 1 && *(p+1) != 0) {
-         out[i++] = ',';
+         s_unixbuf_f[i++] = ',';
      }
      c = (c + 1) % 3;
   }
-  out[i] = '\0';
+  s_unixbuf_f[i] = '\0';
   
-  text_layer_set_text(s_unixtime_layer, out);
+  text_layer_set_text(s_unixtime_layer, s_unixbuf_f);
+}
+
+static void handle_battery(BatteryChargeState charge_state) {
+  static char battery_text[] = "100% charged";
+
+  if (charge_state.is_charging) {
+    snprintf(battery_text, sizeof(battery_text), "charging");
+  } else {
+    snprintf(battery_text, sizeof(battery_text), "%d%% charged", charge_state.charge_percent);
+  }
+  text_layer_set_text(s_battery_layer, battery_text);
 }
 
 static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
@@ -44,43 +62,65 @@ static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
 }
 
 static void main_window_load(Window *window) {
-  // Get information about the Window
   Layer *window_layer = window_get_root_layer(window);
   GRect bounds = layer_get_bounds(window_layer);
 
-  // Create the TextLayer with specific bounds
+  // *** time ***
   s_time_layer = text_layer_create(
       GRect(0, PBL_IF_ROUND_ELSE(8, 0), bounds.size.w, 50));
 
-  // Improve the layout to be more like a watchface
   text_layer_set_background_color(s_time_layer, GColorClear);
   text_layer_set_text_color(s_time_layer, GColorBlack);
   text_layer_set_text(s_time_layer, "00:00");
   text_layer_set_font(s_time_layer, fonts_get_system_font(FONT_KEY_ROBOTO_BOLD_SUBSET_49));
   text_layer_set_text_alignment(s_time_layer, GTextAlignmentCenter);
 
-  // Add it as a child layer to the Window's root layer
   layer_add_child(window_layer, text_layer_get_layer(s_time_layer));
 
-  s_unixtime_layer = text_layer_create(
+  // *** date ***
+  s_date_layer = text_layer_create(
       GRect(0, PBL_IF_ROUND_ELSE(58, 50), bounds.size.w, 28));
 
-  // Improve the layout to be more like a watchface
+  text_layer_set_background_color(s_date_layer, GColorClear);
+  text_layer_set_text_color(s_date_layer, GColorBlack);
+  text_layer_set_text(s_date_layer, "00/00/0000");
+  text_layer_set_font(s_date_layer, fonts_get_system_font(FONT_KEY_GOTHIC_28));
+  text_layer_set_text_alignment(s_date_layer, GTextAlignmentCenter);
+
+  layer_add_child(window_layer, text_layer_get_layer(s_date_layer));
+
+  // *** unix time ***
+  s_unixtime_layer = text_layer_create(
+      GRect(0, PBL_IF_ROUND_ELSE(86, 78), bounds.size.w, 28));
+
   text_layer_set_background_color(s_unixtime_layer, GColorClear);
   text_layer_set_text_color(s_unixtime_layer, GColorBlack);
   text_layer_set_text(s_unixtime_layer, "0,000,000,000");
   text_layer_set_font(s_unixtime_layer, fonts_get_system_font(FONT_KEY_GOTHIC_28));
   text_layer_set_text_alignment(s_unixtime_layer, GTextAlignmentCenter);
 
-  // Add it as a child layer to the Window's root layer
   layer_add_child(window_layer, text_layer_get_layer(s_unixtime_layer));
 
+  // *** battery ***
+  s_battery_layer = text_layer_create(
+      GRect(0, PBL_IF_ROUND_ELSE(114, 106), bounds.size.w, 32));
+
+  text_layer_set_background_color(s_battery_layer, GColorClear);
+  text_layer_set_text_color(s_battery_layer, GColorBlack);
+  text_layer_set_text(s_battery_layer, "100% charging");
+  text_layer_set_font(s_battery_layer, fonts_get_system_font(FONT_KEY_GOTHIC_28));
+  text_layer_set_text_alignment(s_battery_layer, GTextAlignmentCenter);
+
+  layer_add_child(window_layer, text_layer_get_layer(s_battery_layer));
+  handle_battery(battery_state_service_peek());
 }
 
 static void main_window_unload(Window *window) {
   // Destroy TextLayer
   text_layer_destroy(s_time_layer);
+  text_layer_destroy(s_date_layer);
   text_layer_destroy(s_unixtime_layer);
+  text_layer_destroy(s_battery_layer);
 }
 
 
